@@ -18,7 +18,7 @@ In your ROS_PACKAGE_PATH (check your environment variable ROS_PACKAGE_PATH):
 
 	rosrun rosbag_packer rosbag_packer /PATH/TO/IMAGES/ /IMAGE/TOPIC /PATH/TO/DEPTH/ /DEPTH/TOPIC IMAGE_EXTENSION /PATH/TO/OUPUT.BAG
 
-	- `PATH_TO_IMAGES`: Path to the folder with the images
-	- `IMAGE_EXTENSION`: .jpg, .png, etc. write the dot "."
-	- `PATH_TO_OUTPUT_BAG`: Path to save the bag (including the filename e.g. directory/filename.bag)
+- `PATH_TO_IMAGES`: Path to the folder with the images
+- `IMAGE_EXTENSION`: .jpg, .png, etc. write the dot "."
+- `PATH_TO_OUTPUT_BAG`: Path to save the bag (including the filename e.g. directory/filename.bag)
 
