@@ -20,6 +20,7 @@ LIST(APPEND LINK_LIBS
 
 # Include dirs
 INCLUDE_DIRECTORIES(
+	include
 	${OpenCV_INCLUDE_DIRS}
 	${catkin_INCLUDE_DIRS}
 )
