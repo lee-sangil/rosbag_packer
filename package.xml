@@ -5,7 +5,7 @@
 <description>Convert images to ROS bag</description>
 
 <maintainer email="sangil.07.lee@gmail.com">Sangil Lee</maintainer>
-<license>BSD</license>
+<license>GPLv3</license>
 <url type="website">http://www.sangillee.me</url>
 <author email="sangil.07.lee@gmail.com">Sangil Lee</author>
 
