@@ -12,8 +12,8 @@ int main(int argc, char **argv)
 			"Mandatory -o: /Path/to/output.bag.\n"
 			"Optional -d: /Path/to/depth/directory/.\n"
 			"Optional -s: Depth scale (default value: 0.001).\n"
-			"Optional -ti: /Image/topic (default value: /camera/image_raw .\n"
-			"Optional -td: /Depth/topic (default value: /camera/depth).\n"
+			"Optional -ti: /Image/topic (default value: /camera/rgb/image_color).\n"
+			"Optional -td: /Depth/topic (default value: /camera/depth/image).\n"
 			"Optional -ext: Image extension (default value: .png).\n"
 			"Example: rosrun rosbag_packer rosbag_packer -i /path/to/image/directory/ -o /path/to/output.bag" << std::endl;
 		return 1;
@@ -21,76 +21,106 @@ int main(int argc, char **argv)
 
 	ros::start();
 
-	int nframe;
-	std::vector<std::vector<std::string>> dirnames;
-
-	std::vector<std::string> encodings;
-	encodings.push_back(sensor_msgs::image_encodings::BGR8);
-	encodings.push_back(sensor_msgs::image_encodings::TYPE_32FC1);
-	
-	std::vector<std::string> topics;
-	topics.push_back(Parser::getStringOption("-ti", "/camera/image_raw"));
-	topics.push_back(Parser::getStringOption("-td", "/camera/depth"));
+	int nImage, nDepth;
+	std::vector<std::string> imageFiles, depthFiles;
 
 	if( Parser::hasOption("-i") ){
-		std::vector<std::string> filenames = DUtils::FileFunctions::Dir(Parser::getOption("-i").c_str(), Parser::getStringOption("-ext", ".png").c_str(), true);
-		dirnames.push_back(filenames);
+		imageFiles = DUtils::FileFunctions::Dir(Parser::getOption("-i").c_str(), Parser::getStringOption("-ext", ".png").c_str(), true);
 
-		nframe = filenames.size();
-		std::cout << "nImages: " << nframe << std::endl;
+		nImage = imageFiles.size();
+		std::cout << "nImage: " << nImage << std::endl;
 	}
 
 	if( Parser::hasOption("-d") ){
-		std::vector<std::string> filenames = DUtils::FileFunctions::Dir(Parser::getOption("-d").c_str(), Parser::getStringOption("-ext", ".png").c_str(), true);
-		dirnames.push_back(filenames);
+		depthFiles = DUtils::FileFunctions::Dir(Parser::getOption("-d").c_str(), Parser::getStringOption("-ext", ".png").c_str(), true);
 
-		if( dirnames[0].size() != dirnames[1].size() ){
-			std::cerr << "Invalid pairs: images and depths do not match." << std::endl;
-			return 1;
-		}
+		nDepth = depthFiles.size();
+		std::cout << "nDepth: " << nDepth << std::endl;
 	}
 
 	// Output bag
 	rosbag::Bag bag_out(Parser::getOption("-o"), rosbag::bagmode::Write);
 	ros::Time t = ros::Time::now();
 
-	for( size_t i = 0; i < nframe; i++ ){
+	for( size_t i = 0; i < nImage; i++ ){
 		if(!ros::ok())
 			break;
 
-		for( size_t d = 0; d < dirnames.size(); d++ ){
-			cv::Mat im = cv::imread(dirnames[d][i], CV_LOAD_IMAGE_UNCHANGED);
+		cv::Mat im = cv::imread(imageFiles[i], CV_LOAD_IMAGE_UNCHANGED);
 
-			std::vector<char*> tokens;
-			char* token = strtok((char*)dirnames[d][i].c_str(), "/.");
-			while( token != NULL ){
-				tokens.push_back(token);
-				token = strtok(NULL, "/.");
-			}
-
-			tokens.pop_back();
-			std::string usec = std::string(tokens.back());
-			tokens.pop_back();
-			std::string sec = std::string(tokens.back());
-			std::string ctime = sec+'.'+usec;
-			double time = atof(ctime.c_str());
-
-			ros::Time t = ros::Time(time);
-
-			cv_bridge::CvImage cvImage;
-			
-			if( d == 1 ) // depth
-				cvImage.image = im * Parser::getFloatOption("-s", 0.001);
-			else
-				cvImage.image = im;
-
-			cvImage.encoding = encodings[d];
-			cvImage.header.stamp = t;
-
-			bag_out.write(topics[d], ros::Time(t), cvImage.toImageMsg());
+		std::vector<char*> tokens;
+		char* token = strtok((char*)imageFiles[i].c_str(), "/.");
+		while( token != NULL ){
+			tokens.push_back(token);
+			token = strtok(NULL, "/.");
 		}
 
-		double progress = (double)(i+1)/nframe;
+		tokens.pop_back();
+		std::string usec = std::string(tokens.back());
+		tokens.pop_back();
+		std::string sec = std::string(tokens.back());
+		std::string ctime = sec+'.'+usec;
+		double time = atof(ctime.c_str());
+
+		ros::Time t = ros::Time(time);
+
+		cv_bridge::CvImage cvImage;
+		cvImage.image = im;
+		cvImage.encoding = sensor_msgs::image_encodings::BGR8;
+		cvImage.header.stamp = t;
+		cvImage.header.seq = i;
+		cvImage.header.frame_id = "/openni_rgb_optical_frame";
+
+		bag_out.write(Parser::getStringOption("-ti", "/camera/rgb/image_color"), ros::Time(t), cvImage.toImageMsg());
+
+		double progress = (double)(i+1)/(nImage+nDepth);
+		int barWidth = 70;
+
+		std::cout << "[";
+		int pos = barWidth * progress;
+		for (int i = 0; i < barWidth; ++i) {
+			if (i < pos) std::cout << "=";
+			else if (i == pos) std::cout << ">";
+			else std::cout << " ";
+		}
+		std::cout << "] " << int(progress * 100.0) << " %     \r";
+		std::cout.flush();
+	}
+
+	for( size_t i = 0; i < nDepth; i++ ){
+		if(!ros::ok())
+			break;
+
+		cv::Mat im = cv::imread(depthFiles[i], CV_LOAD_IMAGE_UNCHANGED);
+		im.convertTo(im,CV_32FC1);
+		im *= Parser::getFloatOption("-s", 0.001);
+
+		std::vector<char*> tokens;
+		char* token = strtok((char*)depthFiles[i].c_str(), "/.");
+		while( token != NULL ){
+			tokens.push_back(token);
+			token = strtok(NULL, "/.");
+		}
+
+		tokens.pop_back();
+		std::string usec = std::string(tokens.back());
+		tokens.pop_back();
+		std::string sec = std::string(tokens.back());
+		std::string ctime = sec+'.'+usec;
+		double time = atof(ctime.c_str());
+
+		ros::Time t = ros::Time(time);
+
+		cv_bridge::CvImage cvImage;
+		cvImage.image = im;
+		cvImage.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
+		cvImage.header.stamp = t;
+		cvImage.header.seq = i;
+		cvImage.header.frame_id = "/openni_rgb_optical_frame";
+
+		bag_out.write(Parser::getStringOption("-ti", "/camera/depth/image"), ros::Time(t), cvImage.toImageMsg());
+
+		double progress = (double)(i+nImage+1)/(nImage+nDepth);
 		int barWidth = 70;
 
 		std::cout << "[";
