@@ -16,7 +16,7 @@ In your ROS_PACKAGE_PATH (check your environment variable ROS_PACKAGE_PATH):
 
 ## Usage:
 
-	rosrun rosbag_packer rosbag_packer -i /PATH/TO/IMAGES/ -ti /IMAGE/TOPIC -d /PATH/TO/DEPTH/ -td /DEPTH/TOPIC -ext IMAGE_EXTENSION -o /PATH/TO/OUPUT.BAG
+	rosrun rosbag_packer rosbag_packer -i /PATH/TO/IMAGES/ -d /PATH/TO/DEPTH/ -ext IMAGE_EXTENSION -o /PATH/TO/OUPUT.BAG
 
 - `PATH_TO_IMAGES`: Path to the folder with the images
 - `IMAGE_EXTENSION`: .jpg, .png, etc. write the dot "." (default is .png)

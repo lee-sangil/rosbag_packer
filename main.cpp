@@ -12,8 +12,6 @@ int main(int argc, char **argv)
 			"Mandatory -o: /Path/to/output.bag.\n"
 			"Optional -d: /Path/to/depth/directory/.\n"
 			"Optional -s: Depth scale (default value: 0.001).\n"
-			"Optional -ti: /Image/topic (default value: /camera/rgb/image_color).\n"
-			"Optional -td: /Depth/topic (default value: /camera/depth/image).\n"
 			"Optional -ext: Image extension (default value: .png).\n"
 			"Example: rosrun rosbag_packer rosbag_packer -i /path/to/image/directory/ -o /path/to/output.bag" << std::endl;
 		return 1;
@@ -38,16 +36,35 @@ int main(int argc, char **argv)
 		std::cout << "nDepth: " << nDepth << std::endl;
 	}
 
+	sensor_msgs::CameraInfo rgb_info, depth_info;
+	
+	rgb_info.distortion_model = "plumb_bob";
+	rgb_info.D = {1081.3720703125, 0.0, 959.5, 0.0, 1081.3720703125, 539.5, 0.0, 0.0, 1.0};
+	rgb_info.K = {1081.3720703125, 0.0, 959.5, 0.0, 1081.3720703125, 539.5, 0.0, 0.0, 1.0};
+	rgb_info.R = {1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0};
+	rgb_info.P = {1081.3720703125, 0.0, 959.5, 0.0, 0.0, 1081.3720703125, 539.5, 0.0, 0.0, 0.0, 1.0, 0.0};
+	rgb_info.header.frame_id = "/openni_rgb_optical_frame";
+	
+	depth_info.distortion_model = "plumb_bob";
+	depth_info.D = {1081.3720703125, 0.0, 959.5, 0.0, 1081.3720703125, 539.5, 0.0, 0.0, 1.0};
+	depth_info.K = {1081.3720703125, 0.0, 959.5, 0.0, 1081.3720703125, 539.5, 0.0, 0.0, 1.0};
+	depth_info.R = {1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0};
+	depth_info.P = {1081.3720703125, 0.0, 959.5, 0.0, 0.0, 1081.3720703125, 539.5, 0.0, 0.0, 0.0, 1.0, 0.0};
+	depth_info.header.frame_id = "/openni_rgb_optical_frame";
+
+
 	// Output bag
 	rosbag::Bag bag_out(Parser::getOption("-o"), rosbag::bagmode::Write);
 	ros::Time t = ros::Time::now();
 
+	// Write RGB image
 	for( size_t i = 0; i < nImage; i++ ){
 		if(!ros::ok())
 			break;
 
 		cv::Mat im = cv::imread(imageFiles[i], CV_LOAD_IMAGE_UNCHANGED);
 
+		// Grab ros::Time
 		std::vector<char*> tokens;
 		char* token = strtok((char*)imageFiles[i].c_str(), "/.");
 		while( token != NULL ){
@@ -64,6 +81,7 @@ int main(int argc, char **argv)
 
 		ros::Time t = ros::Time(time);
 
+		// Assign values
 		cv_bridge::CvImage cvImage;
 		cvImage.image = im;
 		cvImage.encoding = sensor_msgs::image_encodings::BGR8;
@@ -71,8 +89,16 @@ int main(int argc, char **argv)
 		cvImage.header.seq = i;
 		cvImage.header.frame_id = "/openni_rgb_optical_frame";
 
-		bag_out.write(Parser::getStringOption("-ti", "/camera/rgb/image_color"), ros::Time(t), cvImage.toImageMsg());
+		rgb_info.height = im.rows;
+		rgb_info.width = im.cols;
+		rgb_info.header.stamp = t;
+		rgb_info.header.seq = i;
 
+		// Wirte ROS bag
+		bag_out.write("/camera/rgb/image_color", ros::Time(t), cvImage.toImageMsg());
+		bag_out.write("/camera/rgb/camera_info", ros::Time(t), rgb_info);
+
+		// Update progress bar
 		double progress = (double)(i+1)/(nImage+nDepth);
 		int barWidth = 70;
 
@@ -87,14 +113,18 @@ int main(int argc, char **argv)
 		std::cout.flush();
 	}
 
+	// Write DEPTH image
 	for( size_t i = 0; i < nDepth; i++ ){
 		if(!ros::ok())
 			break;
 
 		cv::Mat im = cv::imread(depthFiles[i], CV_LOAD_IMAGE_UNCHANGED);
+
+		// Compensate depth scale
 		im.convertTo(im,CV_32FC1);
 		im *= Parser::getFloatOption("-s", 0.001);
 
+		// Grab ros::Time
 		std::vector<char*> tokens;
 		char* token = strtok((char*)depthFiles[i].c_str(), "/.");
 		while( token != NULL ){
@@ -111,6 +141,7 @@ int main(int argc, char **argv)
 
 		ros::Time t = ros::Time(time);
 
+		// Assign values
 		cv_bridge::CvImage cvImage;
 		cvImage.image = im;
 		cvImage.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
@@ -118,8 +149,16 @@ int main(int argc, char **argv)
 		cvImage.header.seq = i;
 		cvImage.header.frame_id = "/openni_rgb_optical_frame";
 
-		bag_out.write(Parser::getStringOption("-ti", "/camera/depth/image"), ros::Time(t), cvImage.toImageMsg());
+		depth_info.height = im.rows;
+		depth_info.width = im.cols;
+		depth_info.header.stamp = t;
+		depth_info.header.seq = i;
 
+		// Write ROS bag 
+		bag_out.write("/camera/depth/image", ros::Time(t), cvImage.toImageMsg());
+		bag_out.write("/camera/depth/camera_info", ros::Time(t), depth_info);
+
+		// Update progress bar
 		double progress = (double)(i+nImage+1)/(nImage+nDepth);
 		int barWidth = 70;
 
