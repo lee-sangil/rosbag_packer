@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<launch>
+
+<arg name="file" default="odometry_6.bag"/>
+<arg name="path" default="/media/icsl/DFD6-79B1/odometry_6/"/>
+
+<node pkg="rosbag_packer" name="rosbag_packer" type="rosbag_packer" args="-i $(arg path)rgb/ -d $(arg path)depth/ -o $(arg path)/$(arg file)" output="screen"/>
+
+</launch>
